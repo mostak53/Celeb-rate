@@ -159,11 +159,14 @@ export const AdminDashboard: React.FC = () => {
   const exportToExcel = () => {
     const data = ratings.map(r => {
       const img = images.find(i => i.id === r.imageId);
+      const stats = getStats(r.imageId);
       return {
         'User ID': r.userId,
         'Celebrity': img?.person_name || 'Unknown',
         'Rating': r.rating,
-        'Timestamp': r.timestamp?.toDate ? r.timestamp.toDate().toLocaleString() : new Date(r.timestamp).toLocaleString()
+        'Timestamp': r.timestamp?.toDate ? r.timestamp.toDate().toLocaleString() : new Date(r.timestamp).toLocaleString(),
+        'Celebrity Name': img?.person_name || 'Unknown',
+        'Average Rating': stats.avg
       };
     });
 

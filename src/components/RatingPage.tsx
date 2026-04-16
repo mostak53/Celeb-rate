@@ -25,23 +25,33 @@ export const RatingPage: React.FC = () => {
   const [hoveredStar, setHoveredStar] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Fetch all images and shuffle
+  // Fetch all images and user's ratings to filter
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'images'), (snapshot) => {
-      const imgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CelebrityImage));
-      // Shuffle images
-      const shuffled = [...imgs].sort(() => Math.random() - 0.5);
+    if (!user) return;
+
+    const imagesUnsubscribe = onSnapshot(collection(db, 'images'), (snapshot) => {
+      const allImgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CelebrityImage));
       
-      // Basic logic to avoid same person consecutively if tags exist
-      // For now, just shuffle is fine, but we can refine if needed
-      setImages(shuffled);
-      setLoading(false);
+      // Also fetch user's ratings to filter
+      const ratingsQuery = query(collection(db, 'ratings'), where('userId', '==', user.uid));
+      getDocs(ratingsQuery).then(ratingsSnap => {
+        const ratedImageIds = new Set(ratingsSnap.docs.map(doc => doc.data().imageId));
+        const unratedImgs = allImgs.filter(img => !ratedImageIds.has(img.id));
+        
+        // Shuffle unrated images
+        const shuffled = [...unratedImgs].sort(() => Math.random() - 0.5);
+        setImages(shuffled);
+        setLoading(false);
+      }).catch(error => {
+        console.error("Error fetching ratings for filter:", error);
+        setLoading(false);
+      });
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'images');
     });
 
-    return unsubscribe;
-  }, []);
+    return imagesUnsubscribe;
+  }, [user]);
 
   const handleRate = async (value: number) => {
     if (!user || !images[currentIndex] || ratingLoading) return;
@@ -50,34 +60,23 @@ export const RatingPage: React.FC = () => {
     const currentImage = images[currentIndex];
 
     try {
-      // Check if user already rated this image
-      const q = query(
-        collection(db, 'ratings'), 
-        where('userId', '==', user.uid),
-        where('imageId', '==', currentImage.id)
-      );
-      const existing = await getDocs(q);
-
-      if (!existing.empty) {
-        // Update existing rating
-        await updateDoc(doc(db, 'ratings', existing.docs[0].id), {
-          rating: value,
-          timestamp: serverTimestamp()
-        });
-      } else {
-        // Create new rating
-        await addDoc(collection(db, 'ratings'), {
-          userId: user.uid,
-          imageId: currentImage.id,
-          rating: value,
-          timestamp: serverTimestamp()
-        });
-      }
+      // Create new rating (we only show unrated images now, but updateDoc is safe if logic changes)
+      await addDoc(collection(db, 'ratings'), {
+        userId: user.uid,
+        imageId: currentImage.id,
+        rating: value,
+        timestamp: serverTimestamp()
+      });
 
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        nextImage();
+        // Remove the rated image from the local list immediately for better UX
+        setImages(prev => prev.filter(img => img.id !== currentImage.id));
+        // Reset index if needed (though filter handles it)
+        if (currentIndex >= images.length - 1) {
+          setCurrentIndex(0);
+        }
       }, 800);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'ratings');
