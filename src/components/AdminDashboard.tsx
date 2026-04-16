@@ -157,23 +157,38 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const exportToExcel = () => {
-    const data = ratings.map(r => {
+    // Sheet 1: Detailed Ratings (Old Format)
+    const detailedData = ratings.map(r => {
       const img = images.find(i => i.id === r.imageId);
-      const stats = getStats(r.imageId);
       return {
         'User ID': r.userId,
         'Celebrity': img?.person_name || 'Unknown',
         'Rating': r.rating,
-        'Timestamp': r.timestamp?.toDate ? r.timestamp.toDate().toLocaleString() : new Date(r.timestamp).toLocaleString(),
-        'Celebrity Name': img?.person_name || 'Unknown',
-        'Average Rating': stats.avg
+        'Timestamp': r.timestamp?.toDate ? r.timestamp.toDate().toLocaleString() : new Date(r.timestamp).toLocaleString()
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    // Sheet 2: Celebrity Summary (New Columns Requested)
+    const summaryData = images.map(img => {
+      const stats = getStats(img.id);
+      return {
+        'Celebrity Name': img.person_name,
+        'Average Rating': parseFloat(stats.avg),
+        'Total Ratings Count': stats.count
+      };
+    });
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ratings");
-    XLSX.writeFile(wb, "CelebrityRatings.xlsx");
+    
+    // Add Detailed Sheet
+    const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
+    XLSX.utils.book_append_sheet(wb, wsDetailed, "Detailed Ratings");
+    
+    // Add Summary Sheet
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Celebrity Summary");
+    
+    XLSX.writeFile(wb, "CelebrityRatings_Full_Report.xlsx");
   };
 
   const getStats = (imageId: string) => {
