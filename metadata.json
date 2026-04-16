@@ -1,0 +1,6 @@
+{
+  "name": "Celebrity Rating System",
+  "description": "A full-stack platform to rate celebrity images with real-time updates, admin dashboard, and data export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

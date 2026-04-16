@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["userId", "email", "role"]
+    },
+    "Image": {
+      "title": "Image",
+      "description": "Celebrity image metadata",
+      "type": "object",
+      "properties": {
+        "imageId": { "type": "string" },
+        "imageURL": { "type": "string", "format": "uri" },
+        "person_name": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "upload_time": { "type": "string", "format": "date-time" }
+      },
+      "required": ["imageId", "imageURL", "person_name", "upload_time"]
+    },
+    "Rating": {
+      "title": "Rating",
+      "description": "User rating for an image",
+      "type": "object",
+      "properties": {
+        "ratingId": { "type": "string" },
+        "userId": { "type": "string" },
+        "imageId": { "type": "string" },
+        "rating": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ratingId", "userId", "imageId", "rating", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles"
+    },
+    "/images/{imageId}": {
+      "schema": "Image",
+      "description": "Uploaded celebrity images"
+    },
+    "/ratings/{ratingId}": {
+      "schema": "Rating",
+      "description": "User ratings for images"
+    }
+  }
+}

@@ -1,0 +1,108 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Fields:
+//   - email: string (required)
+//   - role: string (required, ['admin', 'user'])
+//
+// Collection: images
+// Fields:
+//   - imageURL: string (required, URL)
+//   - person_name: string (required)
+//   - tags: list (optional, strings)
+//   - upload_time: timestamp (required)
+//
+// Collection: ratings
+// Fields:
+//   - userId: string (required)
+//   - imageId: string (required)
+//   - rating: number (required, 1-5)
+//   - timestamp: timestamp (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         request.auth.token.email == "252-15-974@diu.edu.bd");
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (
+        url.matches("^https://.*") || 
+        url.matches("^http://.*") || 
+        url.matches("^data:image/.*;base64,.*")
+      );
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role']) &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['admin', 'user'];
+    }
+
+    function isValidImage(data) {
+      return data.keys().hasAll(['imageURL', 'person_name', 'upload_time']) &&
+             isValidUrl(data.imageURL) &&
+             data.person_name is string && data.person_name.size() > 0 && data.person_name.size() < 100 &&
+             data.upload_time is timestamp;
+    }
+
+    function isValidRating(data) {
+      return data.keys().hasAll(['userId', 'imageId', 'rating', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.imageId is string &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.timestamp is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isOwner(userId) && request.resource.data.role == 'user') || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+    }
+
+    match /images/{imageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidImage(request.resource.data);
+      allow update: if isAdmin() && isValidImage(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /ratings/{ratingId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidRating(request.resource.data);
+      allow update: if isAuthenticated() && isValidRating(request.resource.data) && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}
